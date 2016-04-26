@@ -1,6 +1,6 @@
 # Objectsearch
 
-Searches all objects in Siptrack recursively for an attribute and its value. 
+Searches all objects in [Siptrack](https://github.com/sii/siptrackweb) recursively for an attribute and its value. Siptrack by default only indexes a few attributes so this tool enables you to slowly search for any attribute value. 
 
 The attribute value argument takes wildcards like [fname](https://docs.python.org/2/library/fnmatch.html).
 
