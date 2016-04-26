@@ -80,7 +80,7 @@ def traverse_objects(st_object, depth=1):
     if st_object.class_id == args.object_type:
         attribute = st_object.attributes.get(args.attribute_name, '')
         if fnmatch(attribute, args.attribute_value):
-            print('{oid}: {name}: {attr} = {val}'.format(
+            print('{oid};{name};{attr};{val};'.format(
                 oid=st_object.oid,
                 name=st_object.attributes.get('name', 'UNKNOWN'),
                 attr=args.attribute_name,
@@ -126,6 +126,12 @@ parser.add_argument(
     '-m', '--max-recursion',
     default=16,
     help='Maximum recursive depth for searching'
+)
+
+parser.add_argument(
+    '--no-csv-header',
+    action='store_true',
+    help='Disable CSV header'
 )
 
 parser.add_argument(
@@ -188,4 +194,6 @@ if not st_root_category:
         ), file=stderr)
     exit(1)
 
+if not args.no_csv_header:
+    print('oid;name;attribute;value;')
 traverse_objects(st_root_category)
