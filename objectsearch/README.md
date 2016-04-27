@@ -22,4 +22,6 @@ Output is also subject to change but right now it's CSV with semicolon as separa
 
 Show all devices with a model attribute that starts with UCS. 
 
+    python objectsearch.py -c ../siptrack_live.cfg -d 'Sweden:Stockholm' -A model -V 'UCS*' --no-csv-header | sed -n 's/\([[:digit:]]*\);.*/http:\/\/siptrack.localhost\/display\/\1/p'
 
+Search for all devices with a model attribute matching UCS and create siptrack-links from the OID.
