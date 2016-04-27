@@ -52,6 +52,10 @@ for _class in object_classes:
 
 _classes['D']['class types'] = ['device', 'device category']
 
+# Some global counters for stats, explains why it's so damn slow.
+total_values = 0
+found_values = 0
+
 parser = ArgumentParser()
 config = RawConfigParser()
 
@@ -66,12 +70,16 @@ def get_category_by_path(st_dt, path, separator=':'):
 
 
 def traverse_objects(st_object, depth=1):
+    global total_values
+    global found_values
+
+    total_values += 1
     args = parser.parse_args()
 
     maxdepth = args.max_recursion
 
     if depth > maxdepth:
-        if args.verbose:
+        if args.verbose > 1:
             print('Reached max recursive depth, bailing out like a banker',
                   file=stderr
                  )
@@ -80,6 +88,7 @@ def traverse_objects(st_object, depth=1):
     if st_object.class_id == args.object_type:
         attribute = st_object.attributes.get(args.attribute_name, '')
         if fnmatch(attribute, args.attribute_value):
+            found_values += 1
             print('{oid};{name};{attr};{val};'.format(
                 oid=st_object.oid,
                 name=st_object.attributes.get('name', 'UNKNOWN'),
@@ -188,7 +197,7 @@ st_dt = st_view.listChildren(include=['device tree'])[0]
 st_root_category = get_category_by_path(st_dt, args.device_path)
 
 if not st_root_category:
-    if args.verbose:
+    if args.verbose > 1:
         print('{path}: not found in siptrack'.format(
             path=args.device_path
         ), file=stderr)
@@ -196,4 +205,11 @@ if not st_root_category:
 
 if not args.no_csv_header:
     print('oid;name;attribute;value;')
+
 traverse_objects(st_root_category)
+
+if args.verbose:
+    print('Found {found} out of {total} values searched'.format(
+        found=found_values,
+        total=total_values
+    ))
