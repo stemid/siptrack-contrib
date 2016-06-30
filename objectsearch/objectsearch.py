@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding: utf-8
 # 
 # Search objects in Siptrack by attribute value.
 # This is the slow approach and does not use the search index. Because we want
@@ -52,10 +53,6 @@ for _class in object_classes:
 
 _classes['D']['class types'] = ['device', 'device category']
 
-# Some global counters for stats, explains why it's so damn slow.
-total_values = 0
-found_values = 0
-
 parser = ArgumentParser()
 config = RawConfigParser()
 
@@ -69,32 +66,11 @@ def get_category_by_path(st_dt, path, separator=':'):
         return st_category
 
 
-def traverse_objects(st_object, depth=1):
-    global total_values
-    global found_values
+def search_objects(st_object):
+    total_values = 0
+    found_values = 0
 
-    total_values += 1
     args = parser.parse_args()
-
-    maxdepth = args.max_recursion
-
-    if depth > maxdepth:
-        if args.verbose > 1:
-            print('Reached max recursive depth, bailing out like a banker',
-                  file=stderr
-                 )
-        return
-
-    if st_object.class_id == args.object_type:
-        attribute = st_object.attributes.get(args.attribute_name, '')
-        if fnmatch(attribute, args.attribute_value):
-            found_values += 1
-            print('{oid};{name};{attr};{val};'.format(
-                oid=st_object.oid,
-                name=st_object.attributes.get('name', 'UNKNOWN'),
-                attr=args.attribute_name,
-                val=attribute
-            ))
 
     search_classes = []
     try:
@@ -102,8 +78,24 @@ def traverse_objects(st_object, depth=1):
     except KeyError:
         pass
 
-    for child in st_object.listChildren(include=search_classes):
-        traverse_objects(child, depth+1)
+    for node in st_object.traverse(max_depth=args.max_depth, include=search_classes):
+        total_values += 1
+        if node.class_id != args.object_type:
+            continue
+        if node.attributes.get(args.attribute_name, False):
+            continue
+
+        attribute = node.attributes.get(args.attribute_name, '')
+        if fnmatch(attribute, args.attribute_value):
+            found_values += 1
+            print('{oid};{name};{attr};{val};'.format(
+                oid=node.oid,
+                name=node.attributes.get('name', 'UNKNOWN'),
+                attr=args.attribute_name,
+                val=attribute
+            ))
+
+    return total_values, found_values
 
 
 parser.add_argument(
@@ -124,7 +116,7 @@ parser.add_argument(
 parser.add_argument(
     '-d', '--device-path',
     action='store',
-    required=True,
+    default=None,
     dest='device_path',
     help=('Path to the device category to use as root for the import. '
           'Separate path components with : (semicolon) by default.'
@@ -132,7 +124,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    '-m', '--max-recursion',
+    '-m', '--max-depth',
     default=16,
     help='Maximum recursive depth for searching'
 )
@@ -165,8 +157,9 @@ parser.add_argument(
 
 parser.add_argument(
     '-V', '--attribute-value',
-    required=True,
-    help='Attribute value to search for. Takes wildcards like fnmatch'
+    default='?*',
+    help=('Attribute value to search for, takes wildcards like fnmatch. '
+          'Default will list any non-empty name attribute.')
 )
 
 args = parser.parse_args()
@@ -194,9 +187,12 @@ st_view = st.view_tree.getChildByName(
 # Siptrack device tree
 st_dt = st_view.listChildren(include=['device tree'])[0]
 
-st_root_category = get_category_by_path(st_dt, args.device_path)
+if args.device_path:
+    st_root = get_category_by_path(st_dt, args.device_path)
+else:
+    st_root = st_view
 
-if not st_root_category:
+if not st_root:
     if args.verbose > 1:
         print('{path}: not found in siptrack'.format(
             path=args.device_path
@@ -206,7 +202,7 @@ if not st_root_category:
 if not args.no_csv_header:
     print('oid;name;attribute;value;')
 
-traverse_objects(st_root_category)
+total_values, found_values = search_objects(st_root)
 
 if args.verbose:
     print('Found {found} out of {total} values searched'.format(
