@@ -6,6 +6,7 @@
 
 from argparse import ArgumentParser
 from ConfigParser import RawConfigParser
+from pprint import pprint as pp
 
 import siptracklib
 import siptracklib.errors
@@ -63,6 +64,7 @@ user_manager = st.view_tree.user_manager
 
 print(
     '''Available pre-defined variables:
+    pp = pprint() alias
     st = {st}
     st_view = {st_view}
     device_tree = {device_tree}
