@@ -1,4 +1,9 @@
 # coding: utf-8
+# REPL loaded with Siptrack connection.
+#
+# Run like: ipython -i -- repl.py --config siptrack_local.cfg
+# by Stefan Midjich <swehack@gmail.com> - 2015
+
 from argparse import ArgumentParser
 from ConfigParser import RawConfigParser
 
@@ -46,7 +51,7 @@ parser.add_argument(
 st = st_connect()
 
 st_view = st.view_tree.getChildByName(
-    config.get('import', 'base_view'),
+    config.get('siptrack', 'base_view'),
     include=['view']
 )
 
