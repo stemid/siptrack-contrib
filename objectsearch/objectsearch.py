@@ -10,6 +10,7 @@
 
 from __future__ import print_function
 
+import json
 from sys import exit, stderr
 from fnmatch import fnmatch
 from argparse import ArgumentParser, FileType
@@ -51,10 +52,14 @@ _classes = {}
 for _class in object_classes:
     _classes[_class] = {'class types': []}
 
-_classes['D']['class types'] = ['device', 'device category']
+_classes['D']['class types'] = ['device tree', 'device category', 'device']
+_classes['DC']['class types'] = ['device tree', 'device category']
 
 parser = ArgumentParser()
 config = RawConfigParser()
+
+total_values = 0
+found_values = 0
 
 def get_category_by_path(st_dt, path, separator=':'):
     st_category = st_dt
@@ -66,6 +71,50 @@ def get_category_by_path(st_dt, path, separator=':'):
         return st_category
 
 
+def traverse_objects(st_object, depth=1):
+    global total_values
+    global found_values
+
+    total_values += 1
+    args = parser.parse_args()
+
+    maxdepth = args.max_depth
+
+    if depth > maxdepth:
+        if args.verbose > 1:
+            print('Max recursion depth', file=stderr)
+        return
+
+    # Check if class_id matches
+    if st_object.class_id == args.object_type:
+        attribute = st_object.attributes.get(
+            args.attribute_name,
+            ''
+        )
+
+        # Check if attribute value matches
+        if fnmatch(attribute, args.attribute_value):
+            print(u'{oid};{name};{attr};{val};'.format(
+                oid=st_object.oid,
+                name=st_object.attributes.get('name', 'UNKNOWN'),
+                attr=args.attribute_name,
+                val=attribute
+            ))
+
+    search_classes = []
+
+    try:
+        search_classes = _classes[args.object_type]['class types']
+    except KeyError as e:
+        if args.verbose > 1:
+            print(str(e))
+        pass
+
+    # Now continue recursive search
+    for child in st_object.listChildren(include=search_classes):
+        traverse_objects(child, depth+1)
+
+
 def search_objects(st_object):
     total_values = 0
     found_values = 0
@@ -75,24 +124,29 @@ def search_objects(st_object):
     search_classes = []
     try:
         search_classes = _classes[args.object_type]['class types']
-    except KeyError:
+    except KeyError as e:
+        if args.verbose > 1:
+            print(str(e))
         pass
 
-    for node in st_object.traverse(max_depth=args.max_depth, include=search_classes):
+    for node in st_object.traverse(include=search_classes):
         total_values += 1
-        if node.class_id != args.object_type:
-            continue
-        if node.attributes.get(args.attribute_name, False):
+
+        print(json.dumps(node.dictDescribe()))
+        
+        # Continue searching if attribute does not exist
+        attribute_value = node.attributes.get(args.attribute_name, None)
+        if not attribute_value:
             continue
 
-        attribute = node.attributes.get(args.attribute_name, '')
-        if fnmatch(attribute, args.attribute_value):
+        # See if attribute value matches
+        if fnmatch(attribute_value, args.attribute_value):
             found_values += 1
             print('{oid};{name};{attr};{val};'.format(
                 oid=node.oid,
                 name=node.attributes.get('name', 'UNKNOWN'),
                 attr=args.attribute_name,
-                val=attribute
+                val=attribute_value
             ))
 
     return total_values, found_values
@@ -202,7 +256,8 @@ if not st_root:
 if not args.no_csv_header:
     print('oid;name;attribute;value;')
 
-total_values, found_values = search_objects(st_root)
+#total_values, found_values = search_objects(st_root)
+traverse_objects(st_root)
 
 if args.verbose:
     print('Found {found} out of {total} values searched'.format(
